@@ -15,7 +15,7 @@ const pool = new Pool();
 
 // Teste rota
 app.get('/', (req, res) => {
-  res.send('API BykeRoutes Online');
+  res.send('API BikeRoutes Online');
 });
 
 // Cadastrar/atualizar usuário
