@@ -75,22 +75,13 @@ app.post('/rotas', async (req, res) => {
         const lat = coord.latitude !== undefined ? coord.latitude : (coord.coords ? coord.coords.latitude : null);
         const lng = coord.longitude !== undefined ? coord.longitude : (coord.coords ? coord.coords.longitude : null);
         const timestamp = coord.timestamp ?? null;
-        // Converter timestamp JS (ms) para segundos e para formato ISO
-        let timestampISO = null;
-        if (timestamp !== null) {
-          try {
-            timestampISO = new Date(Number(timestamp)).toISOString();
-          } catch (e) {
-            console.log('Erro ao converter timestamp:', timestamp, e);
-          }
-        }
-        console.log('Tentando salvar coordenada:', { lat, lng, timestamp, timestampISO });
-        if (lat !== null && lng !== null && timestampISO !== null) {
+        // Salvar timestamp como bigint (número), não string ISO
+        if (lat !== null && lng !== null && timestamp !== null) {
           await pool.query(
             'INSERT INTO coordenadas (rota_id, latitude, longitude, timestamp) VALUES ($1, $2, $3, $4)',
-            [rota_id, lat, lng, timestampISO]
+            [rota_id, lat, lng, timestamp]
           );
-          console.log('Coordenada salva:', { rota_id, lat, lng, timestampISO });
+          console.log('Coordenada salva:', { rota_id, lat, lng, timestamp });
         } else {
           console.log('Coordenada ignorada por estar incompleta:', coord);
         }
