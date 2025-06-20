@@ -8,7 +8,7 @@ dotenv.config();
 const { Pool } = pkg;
 const app = express();
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Conexão com o banco
 const pool = new Pool();
@@ -52,10 +52,17 @@ app.post('/usuarios', async (req, res) => {
   }
 });
 
+// Exemplo de middleware para evitar cache em endpoints dinâmicos
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 // Cadastrar rota
 app.post('/rotas', async (req, res) => {
   const { usuario_id, tipo, tempo, coordenadas } = req.body;
-  console.log('Recebendo rota:', { usuario_id, tipo, tempo, coordenadas });
+  // Otimização: não logar todas as coordenadas (pode ser muito grande)
+  console.log('Recebendo rota:', { usuario_id, tipo, tempo, pontos: Array.isArray(coordenadas) ? coordenadas.length : 0 });
   try {
     // Verifica se o usuário existe
     const usuarioResult = await pool.query('SELECT id FROM usuarios WHERE id = $1', [usuario_id]);
@@ -118,13 +125,33 @@ app.get('/coordenadas/:rota_id', async (req, res) => {
 app.get('/usuarios/email/:email', async (req, res) => {
   try {
     const email = decodeURIComponent(req.params.email);
-    const result = await pool.query('SELECT * FROM usuarios WHERE email = $1', [email]);
+    // Otimização: limitar resultado a 1 linha
+    const result = await pool.query('SELECT * FROM usuarios WHERE email = $1 LIMIT 1', [email]);
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuário não encontrado.' });
     }
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Erro ao buscar usuário por email:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Endpoint de login por CPF e senha
+app.post('/usuarios/login', async (req, res) => {
+  const { cpf, senha } = req.body;
+  try {
+    // Otimização: limitar resultado a 1 linha
+    const result = await pool.query(
+      'SELECT * FROM usuarios WHERE cpf = $1 AND senha = $2 LIMIT 1',
+      [cpf, senha]
+    );
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'CPF ou senha incorretos.' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Erro ao autenticar usuário:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -140,6 +167,12 @@ app.post('/limpar-banco', async (req, res) => {
     console.error('Erro ao limpar banco:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Centraliza tratamento de erros não tratados
+app.use((err, req, res, next) => {
+  console.error('Erro não tratado:', err);
+  res.status(500).json({ error: 'Erro interno do servidor.' });
 });
 
 const port = process.env.PORT || 3001;
